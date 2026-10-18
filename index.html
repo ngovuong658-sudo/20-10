@@ -11510,8 +11510,8 @@
             <header class="share-flight-heading">
                 <h2 class="share-heading-crossfade">
                     <span class="share-heading-original">
-                        giúp tớ chia sẻ link này<br>
-                        <span class="share-soft">tới các bạn nữ khác được không?</span>
+                        giúp tớ chia sẻ trang web này<br>
+                        <span class="share-soft">tới mọi người được không?</span>
                     </span>
                     <span class="share-heading-thanks" aria-hidden="true">cảm ơn cậu nhiều</span>
                 </h2>
@@ -11922,8 +11922,9 @@
             const MUSIC_HOLD_TIME = 9.7;
             const MUSIC_FADE_START = 8.35;
             const MUSIC_VOLUME = 0.84;
+            // Nhạc chạy liên tục độc lập với tiến trình chuyển cảnh.
             let musicGateClosed = false;
-            let musicAllowedPastGate = false;
+            let musicAllowedPastGate = true;
             let musicFadeTimer = null;
             let musicResumeFadeStart = 0;
             let musicSeekingResume = false;
@@ -11955,74 +11956,13 @@
                     );
             }
 
+            // Không tạm dừng, giảm âm lượng hay chờ click chuyển cảnh để phát tiếp.
             function musicFadeAndHold() {
-                if (musicAllowedPastGate || musicGateClosed)
-                    return;
-                const t = tinySoundtrack.currentTime || 0;
-                if (t >= MUSIC_HOLD_TIME - .02) {
-                    musicGateClosed = true;
-                    scheduleIntroNudge(2000);
-                    tinySoundtrack.pause();
-                    try {
-                        tinySoundtrack.currentTime = MUSIC_HOLD_TIME;
-                    } catch (_) {}
-                    tinySoundtrack.volume = 0;
-                    if (musicFadeTimer !== null) {
-                        clearInterval(musicFadeTimer);
-                        musicFadeTimer = null;
-                    }
-                    return;
-                }
-                if (t >= MUSIC_FADE_START) {
-                    tinySoundtrack.volume = MUSIC_VOLUME * Math.max(0, (MUSIC_HOLD_TIME - t) / (MUSIC_HOLD_TIME - MUSIC_FADE_START));
-                }
+                return;
             }
 
-            // Chỉ phát tiếp sau khi nghe đủ 9,7 giây VÀ click vào "ui cậu đẹp quá".
+            // Giữ hàm tương thích với các lời gọi cũ; nhạc đã chạy liên tục từ đầu.
             function resumeMusicAtBeauty() {
-                if (musicAllowedPastGate)
-                    return;
-                if (!musicGateClosed || tinySoundtrack.currentTime < MUSIC_HOLD_TIME - .045)
-                    return;
-                musicAllowedPastGate = true;
-                musicGateClosed = false;
-                if (musicFadeTimer !== null) {
-                    clearInterval(musicFadeTimer);
-                    musicFadeTimer = null;
-                }
-                musicSeekingResume = true;
-                if (tinySoundtrack.readyState >= 1) {
-                    try {
-                        tinySoundtrack.currentTime = Math.max(MUSIC_HOLD_TIME, tinySoundtrack.currentTime);
-                    } catch (_) {}
-                } else {
-                    tinySoundtrack.addEventListener('loadedmetadata', () => {
-                        if (musicSeekingResume)
-                            tinySoundtrack.currentTime = MUSIC_HOLD_TIME;
-                    }
-                    , {
-                        once: true
-                    });
-                }
-                tinySoundtrack.volume = 0;
-                const fadeIn = (now) => {
-                    if (tinySoundtrack.paused || !musicAllowedPastGate)
-                        return;
-                    const v = Math.min(1, (now - musicResumeFadeStart) / 850);
-                    tinySoundtrack.volume = MUSIC_VOLUME * v;
-                    if (v < 1)
-                        requestAnimationFrame(fadeIn);
-                }
-                ;
-                // Đợi âm thanh PHÁT THỰC SỰ rồi mới đếm 850ms tăng âm lượng.
-                // Nếu bắt đầu rAF trước play() xong thì có thể bị kẹt tại volume=0.
-                tinySoundtrack.addEventListener('playing', () => {
-                    musicResumeFadeStart = performance.now();
-                    requestAnimationFrame(fadeIn);
-                }
-                , {
-                    once: true
-                });
                 startMusicIfAllowed();
             }
 
@@ -12201,11 +12141,7 @@
                         return;
                     // Gọi play() ngay trong tương tác để Chrome cho phép âm thanh.
                     startMusicIfAllowed();
-                    // Không được bỏ qua 9,7 giây đầu dù click nhiều lần.
-                    if (clickCount === 2 && (!musicGateClosed || tinySoundtrack.currentTime < MUSIC_HOLD_TIME - .045)) {
-                        showMusicWaitHint();
-                        return;
-                    }
+                    // Chuyển cảnh không phụ thuộc thời gian nhạc; âm thanh tiếp tục liền mạch.
                     if (clickCount === 2)
                         resumeMusicAtBeauty();
                     hideIntroNudge();
